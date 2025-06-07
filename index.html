@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZenChain ZTC Staking</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 400px; margin: 2rem auto; }
+    input, button { padding: 0.5rem; margin: 0.5rem 0; width: 100%; }
+    #status { margin-top: 1rem; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>ZenChain ZTC Staking</h2>
+
+  <label for="amount">Amount to stake (ZTC):</label>
+  <input type="number" id="amount" min="0.1" step="0.1" value="10" />
+
+  <button id="connectWalletBtn">Connect Wallet</button>
+  <button id="stakeBtn" disabled>Stake ZTC</button>
+
+  <div id="status"></div>
+
+  <script>
+    const ZTC_TOKEN_ADDRESS = "0xC7182Bfb2Dae5e3B41CaF65a99E495B9FBD187C9";
+    const STAKING_CONTRACT_ADDRESS = "0x814ca34d0b3b29f7f3ff2511b1a3f64b32c8f259";
+
+    const ZTC_ABI = [
+      "function approve(address spender, uint256 amount) external returns (bool)",
+      "function allowance(address owner, address spender) external view returns (uint256)"
+    ];
+
+    const STAKING_ABI = [
+      "function bond(uint256 amount, bool payee_staked) external"
+    ];
+
+    let provider, signer, ztcToken, staking;
+
+    const connectWalletBtn = document.getElementById("connectWalletBtn");
+    const stakeBtn = document.getElementById("stakeBtn");
+    const statusEl = document.getElementById("status");
+    const amountInput = document.getElementById("amount");
+
+    connectWalletBtn.onclick = async () => {
+      if (!window.ethereum) {
+        statusEl.textContent = "MetaMask or compatible wallet not detected.";
+        return;
+      }
+
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        ztcToken = new ethers.Contract(ZTC_TOKEN_ADDRESS, ZTC_ABI, signer);
+        staking = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, signer);
+
+        statusEl.textContent = "Wallet connected: " + (await signer.getAddress());
+        stakeBtn.disabled = false;
+        connectWalletBtn.disabled = true;
+      } catch (err) {
+        statusEl.textContent = "Error connecting wallet: " + err.message;
+      }
+    };
+
+    stakeBtn.onclick = async () => {
+      const amount = amountInput.value;
+      if (amount <= 0) {
+        statusEl.textContent = "Please enter a valid amount.";
+        return;
+      }
+
+      stakeBtn.disabled = true;
+      statusEl.textContent = "Checking allowance and approving token if needed...";
+
+      try {
+        const decimals = 18;
+        const stakeAmount = ethers.utils.parseUnits(amount, decimals);
+        const address = await signer.getAddress();
+
+        const allowance = await ztcToken.allowance(address, STAKING_CONTRACT_ADDRESS);
+        if (allowance.lt(stakeAmount)) {
+          const approveTx = await ztcToken.approve(STAKING_CONTRACT_ADDRESS, stakeAmount);
+          statusEl.textContent = "Approving token... Please wait for confirmation.";
+          await approveTx.wait();
+          statusEl.textContent = "Token approved!";
+        } else {
+          statusEl.textContent = "Sufficient allowance detected, skipping approve.";
+        }
+
+        statusEl.textContent = "Staking token...";
+        const stakeTx = await staking.bond(stakeAmount, true);
+        await stakeTx.wait();
+
+        statusEl.textContent = `Successfully staked ${amount} ZTC! 🎉`;
+      } catch (err) {
+        statusEl.textContent = "Error staking token: " + err.message;
+      }
+
+      stakeBtn.disabled = false;
+    };
+  </script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ZenChain ZTC Staking</title>
+  <title>ZTC Staking</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -35,10 +35,20 @@
       margin-top: 1rem;
       font-weight: bold;
     }
+    .loading {
+      color: #666;
+      font-style: italic;
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
   </style>
 </head>
 <body>
-  <h2>ZenChain ZTC Staking</h2>
+  <h2>ZTC Staking</h2>
 
   <label for="amount">Amount to stake (ZTC):</label>
   <input type="number" id="amount" min="0.1" step="0.1" value="10" />
@@ -46,17 +56,21 @@
   <button id="connectWalletBtn">Connect Wallet</button>
   <button id="stakeBtn" disabled>Stake ZTC</button>
 
-  <div id="status"></div>
+  <div id="status">Please connect your wallet to begin</div>
 
-  <!-- Load ethers.js -->
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
-
-  <!-- Staking script HARUS SETELAH ethers.js -->
+  <!-- Load ethers.js from CDN with integrity check -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js" 
+          integrity="sha384-7mXkZl7X5KkZlVwE6s5n0CRpK5Lqj9dG1vFpXZ8/D5RrFU6GjN7vUQkFZ7Z2+5S" 
+          crossorigin="anonymous"></script>
+  
   <script>
-    window.addEventListener("DOMContentLoaded", () => {
+    // Main application
+    document.addEventListener('DOMContentLoaded', function() {
+      // Contract addresses
       const ZTC_TOKEN_ADDRESS = "0xC7182Bfb2Dae5e3B41CaF65a99E495B9FBD187C9";
       const STAKING_CONTRACT_ADDRESS = "0x814ca34d0b3b29f7f3ff2511b1a3f64b32c8f259";
 
+      // Contract ABIs
       const ZTC_ABI = [
         "function approve(address spender, uint256 amount) external returns (bool)",
         "function allowance(address owner, address spender) external view returns (uint256)"
@@ -66,72 +80,130 @@
         "function bond(uint256 amount, bool payee_staked) external"
       ];
 
-      let provider, signer, ztcToken, staking;
-
+      // UI elements
       const connectWalletBtn = document.getElementById("connectWalletBtn");
       const stakeBtn = document.getElementById("stakeBtn");
       const statusEl = document.getElementById("status");
       const amountInput = document.getElementById("amount");
 
-      connectWalletBtn.onclick = async () => {
+      // Application state
+      let provider, signer, ztcToken, stakingContract;
+
+      // Initialize the app
+      async function initApp() {
+        // Check if Web3 provider is available
         if (!window.ethereum) {
-          statusEl.textContent = "MetaMask or compatible wallet not detected.";
+          showError("Please install MetaMask or another Web3 wallet");
           return;
         }
 
+        // Check if ethers is loaded
+        if (typeof ethers === 'undefined') {
+          showError("Error loading blockchain libraries. Please refresh the page.");
+          return;
+        }
+
+        // Set up event listeners
+        connectWalletBtn.addEventListener('click', connectWallet);
+        stakeBtn.addEventListener('click', stakeTokens);
+      }
+
+      // Connect wallet handler
+      async function connectWallet() {
         try {
-          await window.ethereum.request({ method: "eth_requestAccounts" });
+          statusEl.className = 'loading';
+          statusEl.textContent = "Connecting wallet...";
+          
+          // Request account access
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          
+          // Set up ethers provider and signer
           provider = new ethers.providers.Web3Provider(window.ethereum);
           signer = provider.getSigner();
-
+          
+          // Initialize contracts
           ztcToken = new ethers.Contract(ZTC_TOKEN_ADDRESS, ZTC_ABI, signer);
-          staking = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, signer);
-
-          const address = await signer.getAddress();
-          statusEl.textContent = "Wallet connected: " + address;
-          stakeBtn.disabled = false;
+          stakingContract = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, signer);
+          
+          // Update UI
+          const address = accounts[0];
+          statusEl.className = 'success';
+          statusEl.textContent = `Connected: ${address.substring(0, 6)}...${address.substring(38)}`;
           connectWalletBtn.disabled = true;
-        } catch (err) {
-          statusEl.textContent = "Error connecting wallet: " + err.message;
+          stakeBtn.disabled = false;
+          
+          // Listen for account changes
+          window.ethereum.on('accountsChanged', (newAccounts) => {
+            if (newAccounts.length === 0) {
+              // Wallet disconnected
+              statusEl.textContent = "Wallet disconnected";
+              connectWalletBtn.disabled = false;
+              stakeBtn.disabled = true;
+            } else {
+              // Account changed
+              const newAddress = newAccounts[0];
+              statusEl.textContent = `Connected: ${newAddress.substring(0, 6)}...${newAddress.substring(38)}`;
+            }
+          });
+          
+        } catch (error) {
+          showError(`Wallet connection failed: ${error.message}`);
         }
-      };
+      }
 
-      stakeBtn.onclick = async () => {
-        const amount = amountInput.value;
-        if (amount <= 0) {
-          statusEl.textContent = "Please enter a valid amount.";
+      // Stake tokens handler
+      async function stakeTokens() {
+        const amount = parseFloat(amountInput.value);
+        
+        if (isNaN(amount) {
+          showError("Please enter a valid amount");
           return;
         }
-
-        stakeBtn.disabled = true;
-        statusEl.textContent = "Checking allowance and approving token if needed...";
-
+        
         try {
-          const decimals = 18;
-          const stakeAmount = ethers.utils.parseUnits(amount, decimals);
-          const address = await signer.getAddress();
-
-          const allowance = await ztcToken.allowance(address, STAKING_CONTRACT_ADDRESS);
-          if (allowance.lt(stakeAmount)) {
-            const approveTx = await ztcToken.approve(STAKING_CONTRACT_ADDRESS, stakeAmount);
-            statusEl.textContent = "Approving token...";
+          stakeBtn.disabled = true;
+          statusEl.className = 'loading';
+          statusEl.textContent = "Preparing transaction...";
+          
+          // Convert to wei (18 decimals)
+          const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+          const userAddress = await signer.getAddress();
+          
+          // Check allowance
+          statusEl.textContent = "Checking allowance...";
+          const allowance = await ztcToken.allowance(userAddress, STAKING_CONTRACT_ADDRESS);
+          
+          if (allowance.lt(amountWei)) {
+            // Approve tokens first
+            statusEl.textContent = "Approving tokens...";
+            const approveTx = await ztcToken.approve(STAKING_CONTRACT_ADDRESS, amountWei);
             await approveTx.wait();
-            statusEl.textContent = "Token approved!";
-          } else {
-            statusEl.textContent = "Allowance OK, skipping approval.";
           }
-
-          statusEl.textContent = "Sending stake transaction...";
-          const tx = await staking.bond(stakeAmount, true);
-          await tx.wait();
-
-          statusEl.textContent = `✅ Successfully staked ${amount} ZTC!`;
-        } catch (err) {
-          statusEl.textContent = "❌ Error staking: " + err.message;
+          
+          // Execute stake
+          statusEl.textContent = "Staking tokens...";
+          const stakeTx = await stakingContract.bond(amountWei, true);
+          await stakeTx.wait();
+          
+          // Success
+          statusEl.className = 'success';
+          statusEl.textContent = `Successfully staked ${amount} ZTC!`;
+          
+        } catch (error) {
+          showError(`Staking failed: ${error.message}`);
+        } finally {
+          stakeBtn.disabled = false;
         }
+      }
 
-        stakeBtn.disabled = false;
-      };
+      // Helper function to show errors
+      function showError(message) {
+        statusEl.className = 'error';
+        statusEl.textContent = message;
+      }
+
+      // Initialize the application
+      initApp();
     });
   </script>
 </body>

@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZTC Staking | ZenChain</title>
+  <style>
+    :root {
+      --primary: #6c5ce7;
+      --secondary: #a29bfe;
+      --dark: #2d3436;
+      --light: #f5f6fa;
+      --success: #00b894;
+      --warning: #fdcb6e;
+      --danger: #d63031;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--light);
+      color: var(--dark);
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 2rem;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .logo {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    
+    .logo img {
+      height: 60px;
+    }
+    
+    .card {
+      background: var(--light);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #5649d1;
+    }
+    
+    button:disabled {
+      background-color: #b2b2b2;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1.5rem;
+      display: none;
+    }
+    
+    .status.visible {
+      display: block;
+    }
+    
+    .loading {
+      background-color: rgba(253, 203, 110, 0.2);
+      color: var(--dark);
+    }
+    
+    .success {
+      background-color: rgba(0, 184, 148, 0.2);
+      color: var(--success);
+    }
+    
+    .error {
+      background-color: rgba(214, 48, 49, 0.2);
+      color: var(--danger);
+    }
+    
+    .wallet-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background-color: rgba(108, 92, 231, 0.1);
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .wallet-address {
+      font-family: monospace;
+      font-size: 14px;
+    }
+    
+    .network-info {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 14px;
+      color: #666;
+    }
+    
+    .balance-info {
+      margin-top: 1rem;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://zenchain.io/logo.png" alt="ZenChain Logo">
+    </div>
+    
+    <h1>ZTC Staking Platform</h1>
+    
+    <div id="walletInfo" class="wallet-info" style="display: none;">
+      <span>Connected Wallet:</span>
+      <span id="walletAddress" class="wallet-address"></span>
+    </div>
+    
+    <div class="card">
+      <div class="form-group">
+        <label for="amount">Amount to Stake (ZTC):</label>
+        <input type="number" id="amount" min="100" step="1" value="100" placeholder="Enter ZTC amount">
+      </div>
+      
+      <div id="balanceInfo" class="balance-info">
+        Balance: Loading...
+      </div>
+      
+      <button id="connectWalletBtn">Connect Wallet</button>
+      <button id="stakeBtn" disabled>Stake ZTC</button>
+      
+      <div id="status" class="status"></div>
+    </div>
+    
+    <div class="network-info">
+      You are staking on ZenChain Network. Staking rewards are distributed daily.
+    </div>
+  </div>
+
+  <!-- Load ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  
+  <script>
+    // ZenChain Network Configuration
+    const ZENCHAIN_CONFIG = {
+      chainId: "8408", // Replace with actual ZenChain chainId in hex
+      chainName: "ZenChain Testnet",
+      nativeCurrency: {
+        name: "ZenChain Testnet",
+        symbol: "ZTC",
+        decimals: 18
+      },
+      rpcUrls: ["https://zenchain-testnet.api.onfinality.io/public"],
+      blockExplorerUrls: ["https://zentrace.io"]
+    };
+
+    // Contract Addresses (replace with actual addresses)
+    const ZTC_TOKEN_ADDRESS = "0xC7182Bfb2Dae5e3B41CaF65a99E495B9FBD187C9";
+    const STAKING_CONTRACT_ADDRESS = "0x814ca34d0b3b29f7f3ff2511b1a3f64b32c8f259";
+
+    // Contract ABIs (simplified)
+    const ZTC_ABI = [
+      "function approve(address spender, uint256 amount) external returns (bool)",
+      "function allowance(address owner, address spender) external view returns (uint256)",
+      "function balanceOf(address account) external view returns (uint256)"
+    ];
+
+    const STAKING_ABI = [
+      "function stake(uint256 amount) external",
+      "function getStakedAmount(address account) external view returns (uint256)",
+      "function claimRewards() external"
+    ];
+
+    // Global variables
+    let provider, signer, ztcContract, stakingContract;
+    let currentAccount = null;
+
+    // DOM Elements
+    const connectWalletBtn = document.getElementById('connectWalletBtn');
+    const stakeBtn = document.getElementById('stakeBtn');
+    const amountInput = document.getElementById('amount');
+    const statusEl = document.getElementById('status');
+    const walletInfoEl = document.getElementById('walletInfo');
+    const walletAddressEl = document.getElementById('walletAddress');
+    const balanceInfoEl = document.getElementById('balanceInfo');
+
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check if Web3 provider is available
+      if (!window.ethereum) {
+        showError('Please install MetaMask or a Web3-compatible browser extension');
+        connectWalletBtn.disabled = true;
+        return;
+      }
+
+      // Set up event listeners
+      connectWalletBtn.addEventListener('click', connectWallet);
+      stakeBtn.addEventListener('click', stakeTokens);
+
+      // Check if wallet is already connected
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts.length > 0) {
+        currentAccount = accounts[0];
+        await setupProviderAndContracts();
+        updateUI();
+      }
+    });
+
+    // Connect wallet handler
+    async function connectWallet() {
+      try {
+        showStatus('Connecting to wallet...', 'loading');
+        
+        // Request account access
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        currentAccount = accounts[0];
+        
+        // Switch to ZenChain network
+        await switchToZenChainNetwork();
+        
+        // Set up provider and contracts
+        await setupProviderAndContracts();
+        
+        // Update UI
+        updateUI();
+        
+        showStatus('Wallet connected successfully', 'success');
+        
+      } catch (error) {
+        showStatus(`Wallet connection failed: ${error.message}`, 'error');
+        console.error(error);
+      }
+    }
+
+    // Switch to ZenChain network
+    async function switchToZenChainNetwork() {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: ZENCHAIN_CONFIG.chainId }],
+        });
+      } catch (switchError) {
+        // This error code indicates that the chain has not been added to MetaMask
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [ZENCHAIN_CONFIG],
+            });
+          } catch (addError) {
+            throw new Error('Failed to add ZenChain network to your wallet');
+          }
+        } else {
+          throw new Error('Failed to switch to ZenChain network');
+        }
+      }
+    }
+
+    // Set up provider and contracts
+    async function setupProviderAndContracts() {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      signer = provider.getSigner();
+      
+      ztcContract = new ethers.Contract(ZTC_TOKEN_ADDRESS, ZTC_ABI, signer);
+      stakingContract = new ethers.Contract(STAKING_CONTRACT_ADDRESS, STAKING_ABI, signer);
+      
+      // Set up event listeners
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+      
+      // Load initial balance
+      await updateBalance();
+    }
+
+    // Handle account changes
+    function handleAccountsChanged(accounts) {
+      if (accounts.length === 0) {
+        // Wallet disconnected
+        currentAccount = null;
+        showStatus('Wallet disconnected', 'error');
+        resetUI();
+      } else if (accounts[0] !== currentAccount) {
+        // Account changed
+        currentAccount = accounts[0];
+        updateUI();
+        showStatus('Account changed', 'success');
+      }
+    }
+
+    // Handle chain changes
+    function handleChainChanged(chainId) {
+      window.location.reload();
+    }
+
+    // Stake tokens handler
+    async function stakeTokens() {
+      const amount = parseFloat(amountInput.value);
+      
+      if (!amount || amount <= 0) {
+        showStatus('Please enter a valid amount', 'error');
+        return;
+      }
+      
+      try {
+        stakeBtn.disabled = true;
+        showStatus('Preparing transaction...', 'loading');
+        
+        const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+        
+        // Check balance
+        const balance = await ztcContract.balanceOf(currentAccount);
+        if (balance.lt(amountWei)) {
+          showStatus(`Insufficient balance. You have ${ethers.utils.formatUnits(balance, 18)} ZTC`, 'error');
+          return;
+        }
+        
+        // Check allowance
+        showStatus('Checking token allowance...', 'loading');
+        const allowance = await ztcContract.allowance(currentAccount, STAKING_CONTRACT_ADDRESS);
+        
+        if (allowance.lt(amountWei)) {
+          showStatus('Approving tokens... (Confirm in your wallet)', 'loading');
+          const approveTx = await ztcContract.approve(STAKING_CONTRACT_ADDRESS, amountWei);
+          await approveTx.wait();
+        }
+        
+        // Execute stake
+        showStatus('Staking tokens... (Confirm in your wallet)', 'loading');
+        const stakeTx = await stakingContract.stake(amountWei);
+        await stakeTx.wait();
+        
+        showStatus(`Successfully staked ${amount} ZTC!`, 'success');
+        
+        // Update balance after staking
+        await updateBalance();
+        
+      } catch (error) {
+        showStatus(`Staking failed: ${error.message}`, 'error');
+        console.error(error);
+      } finally {
+        stakeBtn.disabled = false;
+      }
+    }
+
+    // Update user balance
+    async function updateBalance() {
+      if (!currentAccount) return;
+      
+      try {
+        const balance = await ztcContract.balanceOf(currentAccount);
+        const stakedAmount = await stakingContract.getStakedAmount(currentAccount);
+        
+        balanceInfoEl.innerHTML = `
+          Wallet Balance: <strong>${ethers.utils.formatUnits(balance, 18)} ZTC</strong><br>
+          Staked Amount: <strong>${ethers.utils.formatUnits(stakedAmount, 18)} ZTC</strong>
+        `;
+      } catch (error) {
+        console.error('Failed to update balance:', error);
+      }
+    }
+
+    // Update UI after connection
+    function updateUI() {
+      connectWalletBtn.disabled = true;
+      stakeBtn.disabled = false;
+      walletInfoEl.style.display = 'flex';
+      walletAddressEl.textContent = `${currentAccount.substring(0, 6)}...${currentAccount.substring(38)}`;
+    }
+
+    // Reset UI when wallet disconnects
+    function resetUI() {
+      connectWalletBtn.disabled = false;
+      stakeBtn.disabled = true;
+      walletInfoEl.style.display = 'none';
+      balanceInfoEl.textContent = 'Balance: Not connected';
+    }
+
+    // Show status message
+    function showStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type} visible`;
+      
+      // Auto-hide success messages after 5 seconds
+      if (type === 'success') {
+        setTimeout(() => {
+          statusEl.classList.remove('visible');
+        }, 5000);
+      }
+    }
+  </script>
+</body>
+</html>

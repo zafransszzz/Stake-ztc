@@ -51,23 +51,23 @@
   <!-- Load ethers.js -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
 
-  <!-- Staking script -->
+  <!-- Staking script HARUS SETELAH ethers.js -->
   <script>
-    const ZTC_TOKEN_ADDRESS = "0xC7182Bfb2Dae5e3B41CaF65a99E495B9FBD187C9";
-    const STAKING_CONTRACT_ADDRESS = "0x814ca34d0b3b29f7f3ff2511b1a3f64b32c8f259";
-
-    const ZTC_ABI = [
-      "function approve(address spender, uint256 amount) external returns (bool)",
-      "function allowance(address owner, address spender) external view returns (uint256)"
-    ];
-
-    const STAKING_ABI = [
-      "function bond(uint256 amount, bool payee_staked) external"
-    ];
-
-    let provider, signer, ztcToken, staking;
-
     window.addEventListener("DOMContentLoaded", () => {
+      const ZTC_TOKEN_ADDRESS = "0xC7182Bfb2Dae5e3B41CaF65a99E495B9FBD187C9";
+      const STAKING_CONTRACT_ADDRESS = "0x814ca34d0b3b29f7f3ff2511b1a3f64b32c8f259";
+
+      const ZTC_ABI = [
+        "function approve(address spender, uint256 amount) external returns (bool)",
+        "function allowance(address owner, address spender) external view returns (uint256)"
+      ];
+
+      const STAKING_ABI = [
+        "function bond(uint256 amount, bool payee_staked) external"
+      ];
+
+      let provider, signer, ztcToken, staking;
+
       const connectWalletBtn = document.getElementById("connectWalletBtn");
       const stakeBtn = document.getElementById("stakeBtn");
       const statusEl = document.getElementById("status");

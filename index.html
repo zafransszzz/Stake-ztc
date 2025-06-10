@@ -3,33 +3,48 @@
 <head>
   <title>ZenChain ZTC Staking (Testnet)</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    input, button { margin: 0.5rem 0; padding: 0.5rem; font-size: 1rem; }
+    #walletAddress { font-weight: bold; color: green; }
+  </style>
 </head>
 <body>
   <h1>ZenChain ZTC Staking</h1>
-  <p>Status: <span id="status">Not connected</span></p>
-  <input id="amount" placeholder="Jumlah ZTC" />
+  
+  <button onclick="connectWallet()">🔗 Connect Wallet</button>
+  <p>Wallet: <span id="walletAddress">Not connected</span></p>
+
+  <input id="amount" placeholder="Jumlah ZTC (contoh: 1)" />
+  <br/>
   <button onclick="stake()">Stake</button>
   <button onclick="unbond()">Unbond</button>
   <button onclick="withdraw()">Withdraw</button>
+
   <script>
     let provider, signer, staking;
-    const addr = "0x0000000000000000000000000000000000000800";
-    const abi = [
+    const stakingAddr = "0x0000000000000000000000000000000000000800";
+    const stakingAbi = [
       "function bondWithRewardDestination(uint256 value, uint8 dest) external",
       "function unbond(uint256 value) external",
       "function withdrawUnbonded(uint32 numSlashingSpans) external"
     ];
 
-    async function connect() {
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("Install MetaMask dulu!");
+        return;
+      }
       provider = new ethers.providers.Web3Provider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
-      staking = new ethers.Contract(addr, abi, signer);
-      document.getElementById("status").innerText = "Connected";
+      const address = await signer.getAddress();
+      document.getElementById("walletAddress").innerText = address;
+      staking = new ethers.Contract(stakingAddr, stakingAbi, signer);
     }
 
     async function stake() {
-      await connect();
+      if (!signer) return alert("Hubungkan wallet dulu!");
       const input = document.getElementById("amount").value;
       const amount = ethers.utils.parseUnits(input, 18);
       const tx = await staking.bondWithRewardDestination(amount, 0);
@@ -38,19 +53,19 @@
     }
 
     async function unbond() {
-      await connect();
+      if (!signer) return alert("Hubungkan wallet dulu!");
       const input = document.getElementById("amount").value;
       const amount = ethers.utils.parseUnits(input, 18);
       const tx = await staking.unbond(amount);
       await tx.wait();
-      alert("⚠️ Unbond dimulai!");
+      alert("⚠️ Unbond berhasil!");
     }
 
     async function withdraw() {
-      await connect();
+      if (!signer) return alert("Hubungkan wallet dulu!");
       const tx = await staking.withdrawUnbonded(0);
       await tx.wait();
-      alert("✔️ ZTC berhasil ditarik!");
+      alert("✔️ Withdraw sukses!");
     }
   </script>
 </body>

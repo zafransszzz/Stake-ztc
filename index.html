@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ZenChain ZTC Staking (Testnet)</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+</head>
+<body>
+  <h1>ZenChain ZTC Staking</h1>
+  <p>Status: <span id="status">Not connected</span></p>
+  <input id="amount" placeholder="Jumlah ZTC" />
+  <button onclick="stake()">Stake</button>
+  <button onclick="unbond()">Unbond</button>
+  <button onclick="withdraw()">Withdraw</button>
+  <script>
+    let provider, signer, staking;
+    const addr = "0x0000000000000000000000000000000000000800";
+    const abi = [
+      "function bondWithRewardDestination(uint256 value, uint8 dest) external",
+      "function unbond(uint256 value) external",
+      "function withdrawUnbonded(uint32 numSlashingSpans) external"
+    ];
+
+    async function connect() {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      staking = new ethers.Contract(addr, abi, signer);
+      document.getElementById("status").innerText = "Connected";
+    }
+
+    async function stake() {
+      await connect();
+      const input = document.getElementById("amount").value;
+      const amount = ethers.utils.parseUnits(input, 18);
+      const tx = await staking.bondWithRewardDestination(amount, 0);
+      await tx.wait();
+      alert("✅ Stake sukses!");
+    }
+
+    async function unbond() {
+      await connect();
+      const input = document.getElementById("amount").value;
+      const amount = ethers.utils.parseUnits(input, 18);
+      const tx = await staking.unbond(amount);
+      await tx.wait();
+      alert("⚠️ Unbond dimulai!");
+    }
+
+    async function withdraw() {
+      await connect();
+      const tx = await staking.withdrawUnbonded(0);
+      await tx.wait();
+      alert("✔️ ZTC berhasil ditarik!");
+    }
+  </script>
+</body>
+</html>
